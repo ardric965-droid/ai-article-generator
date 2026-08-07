@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}AI Article Generator{% endblock %}</title>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: Georgia, "Times New Roman", serif;
+            line-height: 1.5;
+        }
+
+        body {
+            margin: 0;
+            background: #f7f4ef;
+            color: #1f2933;
+        }
+
+        main {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 2rem 1.25rem 3rem;
+        }
+
+        h1, h2 {
+            margin-top: 0;
+        }
+
+        .card {
+            background: #ffffff;
+            border: 1px solid #d9dee7;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .errors {
+            background: #fff1f0;
+            border: 1px solid #f5aca6;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .errors ul {
+            margin: 0.5rem 0 0;
+            padding-left: 1.25rem;
+        }
+
+        .field-error {
+            color: #b42318;
+            margin-top: 0.35rem;
+        }
+
+        label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            margin-bottom: 0.75rem;
+        }
+
+        button,
+        .button {
+            display: inline-block;
+            background: #1f6feb;
+            border: none;
+            border-radius: 8px;
+            color: #ffffff;
+            cursor: pointer;
+            font: inherit;
+            padding: 0.65rem 1rem;
+            text-decoration: none;
+        }
+
+        button:hover,
+        .button:hover {
+            background: #1755b7;
+        }
+
+        .help-text,
+        .muted {
+            color: #52606d;
+        }
+
+        pre {
+            background: #f0f4f8;
+            border-radius: 8px;
+            overflow-x: auto;
+            padding: 1rem;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th, td {
+            border-bottom: 1px solid #e4e7eb;
+            padding: 0.65rem 0.5rem;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background: #eef2ff;
+            border-radius: 999px;
+            font-size: 0.95rem;
+            padding: 0.15rem 0.65rem;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+{% extends "generator/base.html" %}
+
+{% block title %}Upload CSV | AI Article Generator{% endblock %}
+
+{% block content %}
+<h1>Upload CSV</h1>
+<p class="muted">Upload a CSV file to create a generation job. Each row becomes one article.</p>
+
+<div class="card">
+    <h2>Required CSV format</h2>
+    <p>The file must be UTF-8 encoded and include these columns:</p>
+    <ul>
+        <li><strong>title</strong> — required, must not be empty</li>
+        <li><strong>description</strong> — required, must not be empty</li>
+    </ul>
+    <p>Example:</p>
+    <pre>title,description
+Benefits of Exercise,Why regular exercise improves health.
+Saving Money,Simple tips for building savings.</pre>
+</div>
+
+<div class="card">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="errors">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        {% if form.errors %}
+            <div class="errors">
+                <strong>Please fix the following issues:</strong>
+                <ul>
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <p>
+            <label for="{{ form.csv_file.id_for_label }}">{{ form.csv_file.label }}</label>
+            {{ form.csv_file }}
+            {% if form.csv_file.help_text %}
+                <span class="help-text">{{ form.csv_file.help_text }}</span>
+            {% endif %}
+        </p>
+
+        <button type="submit">Upload and create job</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "generator/base.html" %}
+
+{% block title %}Job #{{ job.pk }} Status | AI Article Generator{% endblock %}
+
+{% block content %}
+<h1>Job #{{ job.pk }}</h1>
+<p class="muted">Created {{ job.created_at|date:"N j, Y, P" }}</p>
+
+<div class="card">
+    <h2>Status</h2>
+    <p>
+        <span class="status-badge">{{ job.get_status_display }}</span>
+    </p>
+    <p>
+        Progress: {{ job.completed_rows }} completed,
+        {{ job.failed_rows }} failed,
+        {{ job.total_rows }} total
+    </p>
+
+    {% if output_available %}
+        <p>
+            <a class="button" href="{% url 'download_result' job.pk %}">Download result (TXT)</a>
+        </p>
+    {% elif job.output_file %}
+        <p class="muted">The result file is not available yet.</p>
+    {% else %}
+        <p class="muted">The combined TXT file will appear here when generation finishes.</p>
+    {% endif %}
+
+    <p><a href="{% url 'upload_csv' %}">Upload another CSV</a></p>
+</div>
+
+<div class="card">
+    <h2>Rows</h2>
+    {% if articles %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Row</th>
+                    <th>Title</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for article in articles %}
+                    <tr>
+                        <td>{{ article.row_number }}</td>
+                        <td>{{ article.title }}</td>
+                        <td>{{ article.get_status_display }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="muted">No rows found for this job.</p>
+    {% endif %}
+</div>
+{% endblock %}
