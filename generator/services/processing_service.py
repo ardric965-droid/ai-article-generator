@@ -48,18 +48,24 @@ def process_job(job_id: int) -> GenerationJob:
     ).order_by('row_number')
 
     for article in pending_articles:
+        current_status = GenerationJob.objects.values_list('status', flat=True).get(pk=job.pk)
+        if current_status == GenerationJob.Status.CANCELLED:
+            break
         _process_article(article)
 
-    articles = list(job.articles.order_by('row_number'))
+    # Re-fetch articles directly from DB to bypass prefetched cache
+    articles = list(ArticleResult.objects.filter(job_id=job.pk).order_by('row_number'))
     output_path = write_combined_output(
         articles,
         filename=f'job_{job.pk}_articles.txt',
     )
 
-    completed_rows = job.articles.filter(
+    completed_rows = ArticleResult.objects.filter(
+        job_id=job.pk,
         status=ArticleResult.Status.COMPLETED,
     ).count()
-    failed_rows = job.articles.filter(
+    failed_rows = ArticleResult.objects.filter(
+        job_id=job.pk,
         status=ArticleResult.Status.FAILED,
     ).count()
 
@@ -67,7 +73,14 @@ def process_job(job_id: int) -> GenerationJob:
     job.failed_rows = failed_rows
     job.output_file = output_path.name
     job.completed_at = timezone.now()
-    job.status = _determine_job_status(completed_rows, failed_rows)
+    
+    # Check if job was cancelled during processing
+    current_status = GenerationJob.objects.values_list('status', flat=True).get(pk=job.pk)
+    if current_status == GenerationJob.Status.CANCELLED:
+        job.status = GenerationJob.Status.CANCELLED
+    else:
+        job.status = _determine_job_status(completed_rows, failed_rows)
+
     job.save(
         update_fields=[
             'completed_rows',

@@ -8,6 +8,7 @@ class GenerationJob(models.Model):
         COMPLETED = 'completed', 'Completed'
         PARTIAL = 'partial', 'Partially completed'
         FAILED = 'failed', 'Failed'
+        CANCELLED = 'cancelled', 'Cancelled'
 
     uploaded_file = models.FileField(upload_to='uploads/')
     output_file = models.CharField(

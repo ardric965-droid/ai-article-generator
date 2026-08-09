@@ -4,43 +4,65 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}AI Article Generator{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             color-scheme: light;
-            font-family: Georgia, "Times New Roman", serif;
-            line-height: 1.5;
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
         }
 
         body {
             margin: 0;
-            background: #f7f4ef;
-            color: #1f2933;
+            background: #f8fafc;
+            color: #0f172a;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         main {
             max-width: 760px;
             margin: 0 auto;
-            padding: 2rem 1.25rem 3rem;
+            padding: 3rem 1.5rem 4rem;
         }
 
-        h1, h2 {
+        h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
             margin-top: 0;
+            margin-bottom: 0.5rem;
+            color: #0f172a;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-top: 0;
+            margin-bottom: 0.75rem;
+            color: #1e293b;
         }
 
         .card {
             background: #ffffff;
-            border: 1px solid #d9dee7;
-            border-radius: 10px;
-            padding: 1.5rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 2rem;
             margin-top: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .errors {
-            background: #fff1f0;
-            border: 1px solid #f5aca6;
-            border-radius: 8px;
-            padding: 1rem 1.25rem;
-            margin-bottom: 1rem;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+            color: #991b1b;
         }
 
         .errors ul {
@@ -49,70 +71,198 @@
         }
 
         .field-error {
-            color: #b42318;
-            margin-top: 0.35rem;
+            color: #dc2626;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
         }
 
         label {
             display: block;
-            font-weight: 700;
+            font-weight: 600;
             margin-bottom: 0.5rem;
+            color: #334155;
         }
 
         input[type="file"] {
             display: block;
             width: 100%;
+            padding: 0.75rem 1rem;
+            background: #f1f5f9;
+            border: 2px dashed #cbd5e1;
+            border-radius: 10px;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: border-color 0.2s ease, background 0.2s ease;
             margin-bottom: 0.75rem;
+        }
+
+        input[type="file"]:hover {
+            border-color: #94a3b8;
+            background: #e2e8f0;
         }
 
         button,
         .button {
             display: inline-block;
-            background: #1f6feb;
+            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             color: #ffffff;
             cursor: pointer;
-            font: inherit;
-            padding: 0.65rem 1rem;
+            font-weight: 500;
+            font-size: 1rem;
+            padding: 0.75rem 1.5rem;
             text-decoration: none;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -2px rgba(79, 70, 229, 0.2);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         button:hover,
         .button:hover {
-            background: #1755b7;
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3), 0 4px 6px -4px rgba(79, 70, 229, 0.3);
+            filter: brightness(1.1);
+        }
+
+        button:active,
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .button-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2), 0 2px 4px -2px rgba(239, 68, 68, 0.2);
+        }
+
+        .button-danger:hover {
+            box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.3), 0 4px 6px -4px rgba(239, 68, 68, 0.3);
         }
 
         .help-text,
         .muted {
-            color: #52606d;
+            color: #64748b;
+            font-size: 0.95rem;
         }
 
         pre {
-            background: #f0f4f8;
-            border-radius: 8px;
+            background: #0f172a;
+            color: #cbd5e1;
+            border-radius: 12px;
             overflow-x: auto;
-            padding: 1rem;
+            padding: 1.25rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.9rem;
         }
 
         table {
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             width: 100%;
+            margin-top: 1rem;
         }
 
         th, td {
-            border-bottom: 1px solid #e4e7eb;
-            padding: 0.65rem 0.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 1rem 0.75rem;
             text-align: left;
-            vertical-align: top;
+            vertical-align: middle;
+        }
+
+        th {
+            font-weight: 600;
+            color: #475569;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        tr:first-child th:first-child {
+            border-top-left-radius: 8px;
+        }
+        tr:first-child th:last-child {
+            border-top-right-radius: 8px;
         }
 
         .status-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 9999px;
+            font-size: 0.825rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            text-transform: capitalize;
+            letter-spacing: 0.01em;
+            transition: all 0.3s ease;
+        }
+
+        /* Specific Status Badges */
+        .badge-pending {
+            background-color: #f1f5f9;
+            color: #475569;
+        }
+        .badge-processing, .badge-generating {
+            background-color: #e0f2fe;
+            color: #0369a1;
+            box-shadow: 0 0 0 1px #bae6fd;
+            animation: pulse-animation 2s infinite ease-in-out;
+        }
+        .badge-completed {
+            background-color: #dcfce7;
+            color: #15803d;
+            box-shadow: 0 0 0 1px #bbf7d0;
+        }
+        .badge-partial {
+            background-color: #fef9c3;
+            color: #a16207;
+            box-shadow: 0 0 0 1px #fef08a;
+        }
+        .badge-failed {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            box-shadow: 0 0 0 1px #fecaca;
+        }
+        .badge-cancelled {
+            background-color: #f1f5f9;
+            color: #475569;
+            box-shadow: 0 0 0 1px #e2e8f0;
+        }
+
+        @keyframes pulse-animation {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            height: 10px;
+            background: #e2e8f0;
+            border-radius: 9999px;
+            overflow: hidden;
+            position: relative;
+            margin: 1.5rem 0;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #6366f1);
+            border-radius: 9999px;
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 0%;
+        }
+
+        /* Spinner animation */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .spinner {
             display: inline-block;
-            background: #eef2ff;
-            border-radius: 999px;
-            font-size: 0.95rem;
-            padding: 0.15rem 0.65rem;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+            vertical-align: text-bottom;
+            margin-right: 0.5rem;
         }
     </style>
 </head>

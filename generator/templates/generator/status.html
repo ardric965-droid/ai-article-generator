@@ -9,25 +9,48 @@
 <div class="card">
     <h2>Status</h2>
     <p>
-        <span class="status-badge">{{ job.get_status_display }}</span>
-    </p>
-    <p>
-        Progress: {{ job.completed_rows }} completed,
-        {{ job.failed_rows }} failed,
-        {{ job.total_rows }} total
+        <span id="job-status-badge" class="status-badge badge-{{ job.status }}">
+            {% if job.status == "processing" or job.status == "pending" %}
+                <span class="spinner"></span>
+            {% endif %}
+            {{ job.get_status_display }}
+        </span>
     </p>
 
-    {% if output_available %}
-        <p>
-            <a class="button" href="{% url 'download_result' job.pk %}">Download result (TXT)</a>
-        </p>
-    {% elif job.output_file %}
-        <p class="muted">The result file is not available yet.</p>
-    {% else %}
-        <p class="muted">The combined TXT file will appear here when generation finishes.</p>
-    {% endif %}
+    <!-- Progress Bar -->
+    {% widthratio job.completed_rows|add:job.failed_rows job.total_rows 100 as initial_pct %}
+    <div class="progress-container">
+        <div id="progress-bar" class="progress-bar" style="width: {{ initial_pct|default:"0" }}%;"></div>
+    </div>
 
-    <p><a href="{% url 'upload_csv' %}">Upload another CSV</a></p>
+    <p id="progress-text">
+        Progress: <strong>{{ job.completed_rows }}</strong> completed,
+        <strong>{{ job.failed_rows }}</strong> failed,
+        <strong>{{ job.total_rows }}</strong> total
+    </p>
+
+    <div id="download-section">
+        {% if output_available %}
+            <p>
+                <a class="button" href="{% url 'download_result' job.pk %}">Download result (TXT)</a>
+            </p>
+        {% elif job.output_file %}
+            <p class="muted">The result file is not available yet.</p>
+        {% else %}
+            <p class="muted">The combined TXT file will appear here when generation finishes.</p>
+        {% endif %}
+    </div>
+
+    <div id="stop-section" style="margin-top: 1.25rem;">
+        {% if job.status == "pending" or job.status == "processing" %}
+            <form action="{% url 'stop_job' job.pk %}" method="post" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="button button-danger" id="stop-button">Stop generation</button>
+            </form>
+        {% endif %}
+    </div>
+
+    <p style="margin-top: 1.5rem;"><a href="{% url 'upload_csv' %}" style="color: #4f46e5; text-decoration: none; font-weight: 500;">← Upload another CSV</a></p>
 </div>
 
 <div class="card">
@@ -41,12 +64,14 @@
                     <th>Status</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="articles-table-body">
                 {% for article in articles %}
-                    <tr>
+                    <tr id="article-row-{{ article.row_number }}">
                         <td>{{ article.row_number }}</td>
                         <td>{{ article.title }}</td>
-                        <td>{{ article.get_status_display }}</td>
+                        <td>
+                            <span class="status-badge badge-{{ article.status }}">{{ article.get_status_display }}</span>
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -55,4 +80,87 @@
         <p class="muted">No rows found for this job.</p>
     {% endif %}
 </div>
+
+{% if job.status == "pending" or job.status == "processing" %}
+<script>
+    (function() {
+        const jobId = "{{ job.pk }}";
+        const statusApiUrl = "{% url 'job_status_api' job.pk %}";
+        const downloadUrl = "{% url 'download_result' job.pk %}";
+        
+        const pollInterval = setInterval(async () => {
+            try {
+                const response = await fetch(statusApiUrl);
+                if (!response.ok) return;
+                const data = await response.json();
+                
+                // 1. Update job status badge
+                const badgeEl = document.getElementById("job-status-badge");
+                if (badgeEl) {
+                    badgeEl.className = `status-badge badge-${data.status}`;
+                    let badgeHtml = "";
+                    if (data.status === "processing" || data.status === "pending") {
+                        badgeHtml = '<span class="spinner"></span>';
+                    }
+                    badgeHtml += data.status_display;
+                    badgeEl.innerHTML = badgeHtml;
+                }
+                
+                // 2. Update progress bar
+                const progressBar = document.getElementById("progress-bar");
+                const total = data.total_rows;
+                const done = data.completed_rows + data.failed_rows;
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                if (progressBar) {
+                    progressBar.style.width = pct + "%";
+                }
+                
+                // 3. Update progress text
+                const textEl = document.getElementById("progress-text");
+                if (textEl) {
+                    textEl.innerHTML = `Progress: <strong>${data.completed_rows}</strong> completed, <strong>${data.failed_rows}</strong> failed, <strong>${data.total_rows}</strong> total`;
+                }
+                
+                // 4. Update articles table rows
+                if (data.articles) {
+                    data.articles.forEach(art => {
+                        const rowEl = document.getElementById(`article-row-${art.row_number}`);
+                        if (rowEl) {
+                            const badgeCell = rowEl.cells[2];
+                            if (badgeCell) {
+                                badgeCell.innerHTML = `<span class="status-badge badge-${art.status}">${art.status_display}</span>`;
+                            }
+                        }
+                    });
+                }
+                
+                // 5. Update download link section
+                const downloadSec = document.getElementById("download-section");
+                if (downloadSec) {
+                    if (data.output_available) {
+                        downloadSec.innerHTML = `<p><a class="button" href="${downloadUrl}">Download result (TXT)</a></p>`;
+                    } else if (data.status === "completed" || data.status === "failed" || data.status === "partial" || data.status === "cancelled") {
+                        downloadSec.innerHTML = `<p class="muted">No output file generated or available.</p>`;
+                    }
+                }
+                
+                // 6. Clear stop section if job has finished/been cancelled
+                if (data.status === "completed" || data.status === "failed" || data.status === "partial" || data.status === "cancelled") {
+                    const stopSec = document.getElementById("stop-section");
+                    if (stopSec) {
+                        stopSec.innerHTML = "";
+                    }
+                }
+                
+                // 7. Stop polling if job is finished
+                if (data.status === "completed" || data.status === "failed" || data.status === "partial" || data.status === "cancelled") {
+                    clearInterval(pollInterval);
+                }
+            } catch (err) {
+                console.error("Error polling job status:", err);
+            }
+        }, 2000);
+    })();
+</script>
+{% endif %}
 {% endblock %}
