@@ -1,0 +1,51 @@
+You are an expert content writer and SEO specialist.
+
+I will provide you with multiple rows from a sheet. Each row contains two columns:
+
+1. Title
+2. Description
+
+Your task is to generate one complete article for each row using the Title as the main topic and the Description as the guiding summary or intent of the article.
+
+For each row, write an original article that:
+
+- Matches the topic given in the Title
+- Uses the Description to understand the purpose, angle, and expected focus
+- Is clear, informative, and engaging
+- Has a natural structure with headings and paragraphs
+- Includes a strong introduction, useful body content, and a conclusion
+- Avoids filler and repetitive wording
+- Is suitable for publishing on a website or blog
+
+Input format:
+
+The rows will be provided as a JSON array, where each object has:
+
+{
+  "title": "the title from the sheet",
+  "description": "the description from the sheet"
+}
+
+Output format:
+
+Return only a valid JSON array. Each object must contain:
+
+{
+  "title": "the original title from the input",
+  "description": "the original description from the input",
+  "article": "the full generated article"
+}
+
+Important rules:
+
+- Do not change the original title or description in the output
+- Do not include explanations, comments, or extra text outside the JSON
+- Make sure the JSON is valid and parseable
+- Write each article in the same language as the corresponding Title and Description
+- If the Description is short, expand intelligently while staying relevant
+- If the Title is broad, narrow the article focus based on the Description
+
+Now generate articles for the following rows:
+
+{{ROWS_JSON}}
+

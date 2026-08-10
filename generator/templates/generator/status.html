@@ -18,7 +18,9 @@
     </p>
 
     <!-- Progress Bar -->
-    {% widthratio job.completed_rows|add:job.failed_rows job.total_rows 100 as initial_pct %}
+    {% if job.total_rows %}
+        {% widthratio job.completed_rows|add:job.failed_rows job.total_rows 100 as initial_pct %}
+    {% endif %}
     <div class="progress-container">
         <div id="progress-bar" class="progress-bar" style="width: {{ initial_pct|default:"0" }}%;"></div>
     </div>
@@ -29,15 +31,25 @@
         <strong>{{ job.total_rows }}</strong> total
     </p>
 
-    <div id="download-section">
-        {% if output_available %}
+    <div id="output-sheet-section">
+        {% if job.status == "completed" and job.spreadsheet_id %}
             <p>
-                <a class="button" href="{% url 'download_result' job.pk %}">Download result (TXT)</a>
+                <a href="https://docs.google.com/spreadsheets/d/{{ job.spreadsheet_id }}/edit"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="button">
+                    Open your Google Sheet
+                </a>
             </p>
-        {% elif job.output_file %}
-            <p class="muted">The result file is not available yet.</p>
+            <p class="muted">
+                Results are written back to your original Google Sheet under the
+                <code>content</code>, <code>status</code>, and <code>error</code> columns.
+            </p>
         {% else %}
-            <p class="muted">The combined TXT file will appear here when generation finishes.</p>
+            <p class="muted">
+                Results are being written back to your original Google Sheet under the
+                <code>content</code>, <code>status</code>, and <code>error</code> columns.
+            </p>
         {% endif %}
     </div>
 
@@ -47,10 +59,15 @@
                 {% csrf_token %}
                 <button type="submit" class="button button-danger" id="stop-button">Stop generation</button>
             </form>
+        {% elif job.status == "cancelled" or job.status == "failed" %}
+            <form action="{% url 'resume_job' job.pk %}" method="post" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="button" id="resume-button">Resume generation</button>
+            </form>
         {% endif %}
     </div>
 
-    <p style="margin-top: 1.5rem;"><a href="{% url 'upload_csv' %}" style="color: #4f46e5; text-decoration: none; font-weight: 500;">← Upload another CSV</a></p>
+    <p style="margin-top: 1.5rem;"><a href="{% url 'upload_csv' %}" style="color: #4f46e5; text-decoration: none; font-weight: 500;">← Upload another sheet</a></p>
 </div>
 
 <div class="card">
@@ -67,7 +84,7 @@
             <tbody id="articles-table-body">
                 {% for article in articles %}
                     <tr id="article-row-{{ article.row_number }}">
-                        <td>{{ article.row_number }}</td>
+                        <td>{{ article.data_row_index }}</td>
                         <td>{{ article.title }}</td>
                         <td>
                             <span class="status-badge badge-{{ article.status }}">{{ article.get_status_display }}</span>
@@ -86,7 +103,6 @@
     (function() {
         const jobId = "{{ job.pk }}";
         const statusApiUrl = "{% url 'job_status_api' job.pk %}";
-        const downloadUrl = "{% url 'download_result' job.pk %}";
         
         const pollInterval = setInterval(async () => {
             try {
@@ -134,13 +150,25 @@
                     });
                 }
                 
-                // 5. Update download link section
-                const downloadSec = document.getElementById("download-section");
-                if (downloadSec) {
-                    if (data.output_available) {
-                        downloadSec.innerHTML = `<p><a class="button" href="${downloadUrl}">Download result (TXT)</a></p>`;
-                    } else if (data.status === "completed" || data.status === "failed" || data.status === "partial" || data.status === "cancelled") {
-                        downloadSec.innerHTML = `<p class="muted">No output file generated or available.</p>`;
+                // 5. Update output sheet message section
+                const sheetSec = document.getElementById("output-sheet-section");
+                if (sheetSec) {
+                    if (data.status === "completed" || data.status === "failed" || data.status === "partial" || data.status === "cancelled") {
+                        if (data.spreadsheet_id) {
+                            sheetSec.innerHTML = `
+                                <p>
+                                    <a href="https://docs.google.com/spreadsheets/d/${data.spreadsheet_id}/edit"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       class="button">
+                                        Open your Google Sheet
+                                    </a>
+                                </p>
+                                <p class="muted">Results are written back to your original Google Sheet under the content, status, and error columns.</p>
+                            `;
+                        } else {
+                            sheetSec.innerHTML = `<p class="muted">Results are written back to your original Google Sheet under the content, status, and error columns.</p>`;
+                        }
                     }
                 }
                 

@@ -5,6 +5,8 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from django.conf import settings
+
 GROQ_CHAT_COMPLETIONS_URL = 'https://api.groq.com/openai/v1/chat/completions'
 DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
 DEFAULT_REQUEST_TIMEOUT = 60
@@ -30,14 +32,39 @@ class LLMTemporaryError(Exception):
     """Raised for transient failures that may succeed on retry."""
 
 
-def build_prompt(title: str, description: str) -> str:
-    """Build the user prompt sent to the Groq chat completion API."""
-    return (
-        'Write a clear, engaging article based on the following input.\n\n'
-        f'Title: {title.strip()}\n'
-        f'Description: {description.strip()}\n\n'
-        'Return only the article text.'
-    )
+def build_prompt(rows: list[dict[str, str]]) -> str:
+    """Build the user prompt sent to the Groq chat completion API.
+
+    The prompt template in ``prompts/article_prompt.txt`` expects the rows to
+    be inserted at the ``{{ROWS_JSON}}`` placeholder as a JSON array of
+    ``{title, description}`` objects. We fill that placeholder directly with
+    ``str.replace`` so literal braces in the template never need escaping.
+    """
+    prompt_dir = getattr(settings, 'PROMPTS_DIR', settings.BASE_DIR / 'prompts')
+    prompt_path = prompt_dir / 'article_prompt.txt'
+
+    if not prompt_path.is_file():
+        raise LLMConfigurationError(
+            f"LLM prompt template file not found at '{prompt_path}'."
+        )
+
+    try:
+        with open(prompt_path, 'r', encoding='utf-8') as f:
+            template = f.read()
+    except Exception as exc:
+        raise LLMConfigurationError(
+            f"Failed to read prompt template file: {exc}"
+        ) from exc
+
+    rows_json = json.dumps(rows, ensure_ascii=False)
+
+    if '{{ROWS_JSON}}' not in template:
+        raise LLMConfigurationError(
+            "Prompt template is missing the required {{ROWS_JSON}} placeholder "
+            "for the row data."
+        )
+
+    return template.replace('{{ROWS_JSON}}', rows_json)
 
 
 def _get_api_key() -> str:
@@ -69,6 +96,7 @@ def call_groq_chat_completion(
         'model': model or _get_model(),
         'messages': messages,
         'temperature': 0.7,
+        'response_format': {'type': 'json_object'},
     }
     request_data = json.dumps(payload).encode('utf-8')
     request = urllib.request.Request(
@@ -117,6 +145,57 @@ def call_groq_chat_completion(
         ) from exc
 
 
+def _validate_article_payload(data: Any, response_text: str) -> list[dict]:
+    """Validate the LLM response and return a list of article objects.
+
+    The LLM may return either a JSON array of ``{title, description, article}``
+    objects or a single article object. Both formats are accepted.
+    """
+    if isinstance(data, list):
+        articles = data
+    elif isinstance(data, dict):
+        if all(key in data for key in ('title', 'description', 'article')):
+            articles = [data]
+        else:
+            for value in data.values():
+                if isinstance(value, list):
+                    articles = value
+                    break
+            else:
+                raise LLMRequestError(
+                    f"LLM did not return a JSON array of articles. Response content: {response_text}"
+                )
+    else:
+        raise LLMRequestError(
+            f"LLM response must be a JSON array or a single article object. "
+            f"Got {type(data).__name__}. Response content: {response_text}"
+        )
+
+    for article_obj in articles:
+        if not isinstance(article_obj, dict):
+            raise LLMRequestError(
+                f"LLM response contains a non-object article entry. Response content: {response_text}"
+            )
+
+        required_keys = ['title', 'description', 'article']
+        missing_keys = [key for key in required_keys if key not in article_obj]
+        if missing_keys:
+            raise LLMRequestError(
+                f"LLM response is missing required keys: {', '.join(missing_keys)}. "
+                f"Response content: {response_text}"
+            )
+
+        for key in required_keys:
+            value = article_obj[key]
+            if not isinstance(value, str) or not value.strip():
+                raise LLMRequestError(
+                    f"LLM response field '{key}' must be a non-empty string. "
+                    f"Response content: {response_text}"
+                )
+
+    return articles
+
+
 def generate_article(
     title: str,
     description: str,
@@ -126,35 +205,59 @@ def generate_article(
 ) -> str:
     """Generate an article for the given title and description using Groq."""
     api_key = _get_api_key()
+
+    # The prompt template expects a JSON array of rows, so wrap this single
+    # title/description pair in a one-element list.
+    rows = [{'title': title, 'description': description}]
+
+    # Generate the prompt, which also checks if prompts/article_prompt.txt is available
+    prompt_content = build_prompt(rows)
+    
     messages = [
         {
             'role': 'system',
             'content': (
-                'You are a helpful writing assistant that produces well-structured '
-                'articles in plain text.'
+                'You are a helpful writing assistant that produces structured articles in JSON.'
             ),
         },
         {
             'role': 'user',
-            'content': build_prompt(title, description),
+            'content': prompt_content,
         },
     ]
 
     last_error: Exception | None = None
+    response_text = ""
 
     for attempt in range(1, max_retries + 1):
         try:
-            return call_groq_chat_completion(
+            response_text = call_groq_chat_completion(
                 api_key=api_key,
                 messages=messages,
                 timeout=timeout,
             )
+            break
         except LLMTemporaryError as exc:
             last_error = exc
             if attempt == max_retries:
-                break
+                raise LLMRequestError(
+                    f'Failed to generate article after {max_retries} attempts: {last_error}'
+                ) from last_error
             time.sleep(2 ** (attempt - 1))
 
-    raise LLMRequestError(
-        f'Failed to generate article after {max_retries} attempts: {last_error}'
-    ) from last_error
+    # Parse and validate the response
+    try:
+        data = json.loads(response_text)
+    except json.JSONDecodeError as exc:
+        raise LLMRequestError(
+            f"LLM response is not a valid JSON object: {exc}\nResponse content: {response_text}"
+        ) from exc
+
+    articles = _validate_article_payload(data, response_text)
+    if len(articles) != 1:
+        raise LLMRequestError(
+            f"LLM returned {len(articles)} articles but exactly 1 was expected. "
+            f"Response content: {response_text}"
+        )
+    return articles[0]['article'].strip()
+

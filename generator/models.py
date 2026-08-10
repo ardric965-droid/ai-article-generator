@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -11,10 +12,18 @@ class GenerationJob(models.Model):
         CANCELLED = 'cancelled', 'Cancelled'
 
     uploaded_file = models.FileField(upload_to='uploads/')
-    output_file = models.CharField(
-        max_length=512,
+    output_sheet_url = models.URLField(
         blank=True,
-        help_text='Filename of the combined TXT file in the outputs directory.',
+        null=True,
+        help_text='URL of the new Google Sheet with the generated articles, shared with the user.',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='generation_jobs',
+        null=True,
+        blank=True,
+        help_text='The logged-in user who owns this job; used to share the output sheet.',
     )
     status = models.CharField(
         max_length=20,
@@ -24,6 +33,7 @@ class GenerationJob(models.Model):
     total_rows = models.PositiveIntegerField(default=0)
     completed_rows = models.PositiveIntegerField(default=0)
     failed_rows = models.PositiveIntegerField(default=0)
+    spreadsheet_id = models.CharField(max_length=255, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
@@ -58,6 +68,7 @@ class ArticleResult(models.Model):
     )
     error_message = models.TextField(blank=True)
     attempts = models.PositiveSmallIntegerField(default=0)
+    sheet_row_number = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ['row_number']

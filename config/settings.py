@@ -13,12 +13,16 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    load_dotenv = None
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-load_dotenv(BASE_DIR / '.env')
+if load_dotenv is not None:
+    load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -129,10 +133,22 @@ STATIC_URL = 'static/'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Generated article TXT files
-OUTPUTS_DIR = BASE_DIR / 'outputs'
+# Google Sheets Configuration
+GOOGLE_CREDENTIALS_FILE = os.environ.get(
+    'GOOGLE_CREDENTIALS_FILE',
+    str(BASE_DIR / 'google_credentials.json'),
+)
+
+# LLM Prompts Configuration
+PROMPTS_DIR = BASE_DIR / 'prompts'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'upload_csv'
+LOGOUT_REDIRECT_URL = 'login'
+
+

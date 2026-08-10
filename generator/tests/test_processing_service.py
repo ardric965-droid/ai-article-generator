@@ -1,5 +1,3 @@
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -12,10 +10,6 @@ from generator.services.processing_service import process_job
 
 class ProcessJobTests(TestCase):
     def setUp(self):
-        self.outputs_dir = Path(tempfile.mkdtemp())
-        self.settings_override = self.settings(OUTPUTS_DIR=self.outputs_dir)
-        self.settings_override.enable()
-
         self.job = GenerationJob.objects.create(
             uploaded_file=SimpleUploadedFile(
                 'rows.csv',
@@ -23,6 +17,7 @@ class ProcessJobTests(TestCase):
             ),
             total_rows=2,
             status=GenerationJob.Status.PENDING,
+            spreadsheet_id='sheet-id-123',
         )
         self.first_article = ArticleResult.objects.create(
             job=self.job,
@@ -37,11 +32,15 @@ class ProcessJobTests(TestCase):
             description='Tips for saving.',
         )
 
-    def tearDown(self):
-        self.settings_override.disable()
-
     @patch('generator.services.processing_service.generate_article')
-    def test_process_job_saves_successful_articles_and_output(self, mock_generate):
+    @patch('generator.services.processing_service.update_sheet_row')
+    @patch('generator.services.processing_service.ensure_output_columns')
+    def test_process_job_saves_successful_articles_and_writes_back(
+        self,
+        mock_ensure_columns,
+        mock_update_row,
+        mock_generate,
+    ):
         mock_generate.side_effect = [
             'Generated exercise article.',
             'Generated savings article.',
@@ -55,15 +54,40 @@ class ProcessJobTests(TestCase):
         self.assertEqual(processed_job.status, GenerationJob.Status.COMPLETED)
         self.assertEqual(processed_job.completed_rows, 2)
         self.assertEqual(processed_job.failed_rows, 0)
-        self.assertEqual(processed_job.output_file, f'job_{self.job.pk}_articles.txt')
         self.assertIsNotNone(processed_job.completed_at)
         self.assertEqual(self.first_article.status, ArticleResult.Status.COMPLETED)
         self.assertEqual(self.first_article.attempts, 1)
         self.assertEqual(self.first_article.article, 'Generated exercise article.')
-        self.assertTrue((self.outputs_dir / processed_job.output_file).exists())
+
+        mock_ensure_columns.assert_called_once()
+        self.assertEqual(mock_ensure_columns.call_args[0][0], 'sheet-id-123')
+        self.assertEqual(mock_update_row.call_count, 2)
+        mock_update_row.assert_any_call(
+            'sheet-id-123',
+            mock_update_row.call_args[0][1],
+            1,
+            'Generated exercise article.',
+            ArticleResult.Status.COMPLETED,
+            '',
+        )
+        mock_update_row.assert_any_call(
+            'sheet-id-123',
+            mock_update_row.call_args[0][1],
+            2,
+            'Generated savings article.',
+            ArticleResult.Status.COMPLETED,
+            '',
+        )
 
     @patch('generator.services.processing_service.generate_article')
-    def test_process_job_continues_after_row_failure(self, mock_generate):
+    @patch('generator.services.processing_service.update_sheet_row')
+    @patch('generator.services.processing_service.ensure_output_columns')
+    def test_process_job_continues_after_row_failure(
+        self,
+        mock_ensure_columns,
+        mock_update_row,
+        mock_generate,
+    ):
         mock_generate.side_effect = [
             'Generated exercise article.',
             LLMRequestError('Temporary outage'),
@@ -82,8 +106,43 @@ class ProcessJobTests(TestCase):
         self.assertEqual(self.second_article.error_message, 'Temporary outage')
         self.assertEqual(self.second_article.attempts, 1)
 
-        content = (self.outputs_dir / processed_job.output_file).read_text(
-            encoding='utf-8',
+        mock_ensure_columns.assert_called_once()
+        self.assertEqual(mock_ensure_columns.call_args[0][0], 'sheet-id-123')
+        self.assertEqual(mock_update_row.call_count, 2)
+        mock_update_row.assert_any_call(
+            'sheet-id-123',
+            mock_update_row.call_args[0][1],
+            1,
+            'Generated exercise article.',
+            ArticleResult.Status.COMPLETED,
+            '',
         )
-        self.assertIn('Generated exercise article.', content)
-        self.assertIn('ERROR: Temporary outage', content)
+        mock_update_row.assert_any_call(
+            'sheet-id-123',
+            mock_update_row.call_args[0][1],
+            2,
+            '',
+            ArticleResult.Status.FAILED,
+            'Temporary outage',
+        )
+
+    @patch('generator.services.processing_service.generate_article')
+    @patch('generator.services.processing_service.update_sheet_row')
+    @patch('generator.services.processing_service.ensure_output_columns')
+    def test_process_job_ensures_output_columns_and_updates_rows(
+        self,
+        mock_ensure_columns,
+        mock_update_row,
+        mock_generate,
+    ):
+        mock_generate.side_effect = [
+            'Generated exercise article.',
+            'Generated savings article.',
+        ]
+
+        processed_job = process_job(self.job.pk)
+
+        mock_ensure_columns.assert_called_once()
+        self.assertEqual(mock_ensure_columns.call_args[0][0], 'sheet-id-123')
+        self.assertEqual(mock_update_row.call_count, 2)
+        self.assertIsNone(processed_job.output_sheet_url)

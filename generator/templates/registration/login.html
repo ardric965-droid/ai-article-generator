@@ -1,0 +1,41 @@
+{% extends "generator/base.html" %}
+
+{% block title %}Login | AI Article Generator{% endblock %}
+
+{% block content %}
+<h1>Login</h1>
+<p class="muted">Sign in to create article generation jobs and view progress.</p>
+
+<div class="card">
+    {% if form.errors %}
+        <div class="errors">
+            <strong>Your username and password didn’t match.</strong>
+        </div>
+    {% endif %}
+
+    {% if next %}
+        {% if user.is_authenticated %}
+            <p class="muted">Your account does not have access to this page.</p>
+        {% else %}
+            <p class="muted">Please log in to continue.</p>
+        {% endif %}
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <p>
+            <label for="id_username">Username</label>
+            <input type="text" name="username" autofocus required id="id_username">
+        </p>
+
+        <p>
+            <label for="id_password">Password</label>
+            <input type="password" name="password" required id="id_password">
+        </p>
+
+        <button type="submit">Sign in</button>
+    </form>
+</div>
+{% endblock %}

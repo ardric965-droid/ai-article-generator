@@ -7,5 +7,5 @@ urlpatterns = [
     path('jobs/<int:job_id>/status/', views.job_status, name='job_status'),
     path('jobs/<int:job_id>/status/api/', views.job_status_api, name='job_status_api'),
     path('jobs/<int:job_id>/stop/', views.stop_job, name='stop_job'),
-    path('jobs/<int:job_id>/result/', views.download_result, name='download_result'),
+    path('jobs/<int:job_id>/resume/', views.resume_job, name='resume_job'),
 ]
