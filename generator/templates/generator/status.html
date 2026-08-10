@@ -31,7 +31,7 @@
         <strong>{{ job.total_rows }}</strong> total
     </p>
 
-    <div id="output-sheet-section">
+    <div id="sheet-section">
         {% if job.status == "completed" and job.spreadsheet_id %}
             <p>
                 <a href="https://docs.google.com/spreadsheets/d/{{ job.spreadsheet_id }}/edit"
@@ -67,7 +67,7 @@
         {% endif %}
     </div>
 
-    <p style="margin-top: 1.5rem;"><a href="{% url 'upload_csv' %}" style="color: #4f46e5; text-decoration: none; font-weight: 500;">← Upload another sheet</a></p>
+    <p style="margin-top: 1.5rem;"><a href="{% url 'upload_spreadsheet' %}" style="color: #4f46e5; text-decoration: none; font-weight: 500;">← Upload another sheet</a></p>
 </div>
 
 <div class="card">
@@ -151,11 +151,11 @@
                 }
                 
                 // 5. Update output sheet message section
-                const sheetSec = document.getElementById("output-sheet-section");
-                if (sheetSec) {
+                const sheetSection = document.getElementById("sheet-section");
+                if (sheetSection) {
                     if (data.status === "completed" || data.status === "failed" || data.status === "partial" || data.status === "cancelled") {
                         if (data.spreadsheet_id) {
-                            sheetSec.innerHTML = `
+                            sheetSection.innerHTML = `
                                 <p>
                                     <a href="https://docs.google.com/spreadsheets/d/${data.spreadsheet_id}/edit"
                                        target="_blank"
@@ -167,7 +167,7 @@
                                 <p class="muted">Results are written back to your original Google Sheet under the content, status, and error columns.</p>
                             `;
                         } else {
-                            sheetSec.innerHTML = `<p class="muted">Results are written back to your original Google Sheet under the content, status, and error columns.</p>`;
+                            sheetSection.innerHTML = `<p class="muted">Results are written back to your original Google Sheet under the content, status, and error columns.</p>`;
                         }
                     }
                 }

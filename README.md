@@ -135,8 +135,7 @@ python manage.py test
     *   `views.py`: Coordinates HTTP request endpoints, redirects, and background threading.
     *   `forms.py`: Handles Google Sheet URL validation.
     *   `services/`:
-        *   `google_sheets_service.py`: Reads and validates the user's input Google Sheet (read-only).
-        *   `google_sheets_output_service.py`: Creates the output Google Sheet, writes the results, and shares it with the user.
+        *   `google_sheets_service.py`: Reads rows from and writes results (`content`/`status`/`error`) back to the user's input Google Sheet.
         *   `llm_service.py`: Manages Groq API calls, prompts, timeouts, and exponential backoff retry cycles.
         *   `processing_service.py`: Orchestrates job queues, loops rows, and handles cancellation markers.
     *   `templates/`: HTML rendering templates with built-in responsive styling and progress script hooks.

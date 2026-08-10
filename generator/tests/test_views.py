@@ -1,7 +1,6 @@
 import json
 from unittest.mock import patch
 from django.contrib.auth.models import User
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
@@ -11,7 +10,6 @@ from generator.models import ArticleResult, GenerationJob
 class JobStatusApiTests(TestCase):
     def setUp(self):
         self.job = GenerationJob.objects.create(
-            uploaded_file=SimpleUploadedFile('test.csv', b'title,description\n'),
             total_rows=2,
             status=GenerationJob.Status.PROCESSING,
             completed_rows=1,
@@ -46,7 +44,6 @@ class AuthenticatedJobStatusApiTests(TestCase):
         self.user = User.objects.create_user(username='tester', email='tester@example.com', password='testpass123')
         self.client.login(username='tester', password='testpass123')
         self.job = GenerationJob.objects.create(
-            uploaded_file=SimpleUploadedFile('test.csv', b'title,description\n'),
             total_rows=2,
             status=GenerationJob.Status.PROCESSING,
             completed_rows=1,
@@ -82,20 +79,8 @@ class AuthenticatedJobStatusApiTests(TestCase):
         self.assertEqual(data['total_rows'], 2)
         self.assertEqual(data['progress'], 50)
         self.assertEqual(data['progress_text'], '1/2 rows processed')
-        self.assertEqual(data['output_sheet_url'], '')
         self.assertEqual(data['spreadsheet_id'], '')
         self.assertFalse(data['is_complete'])
-
-    def test_status_api_returns_output_sheet_url_as_empty_string(self):
-        self.job.output_sheet_url = 'https://docs.google.com/spreadsheets/d/out-123/edit'
-        self.job.save(update_fields=['output_sheet_url'])
-
-        url = reverse('job_status_api', kwargs={'job_id': self.job.pk})
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, 200)
-        data = json.loads(response.content)
-        self.assertEqual(data['output_sheet_url'], '')
 
         articles = data['articles']
         self.assertEqual(len(articles), 2)
@@ -176,7 +161,7 @@ class UploadGoogleSheetTests(TestCase):
             {'row_number': 2, 'title': 'Test Title', 'description': 'Test Description'},
         ]
 
-        url = reverse('upload_csv')
+        url = reverse('upload_spreadsheet')
         response = self.client.post(url, {'spreadsheet_url': 'https://docs.google.com/spreadsheets/d/sheet-id-123/edit'})
 
         job = GenerationJob.objects.first()
@@ -189,13 +174,12 @@ class UploadGoogleSheetTests(TestCase):
         article = job.articles.get(row_number=2)
         self.assertEqual(article.title, 'Test Title')
         self.assertEqual(article.description, 'Test Description')
-        self.assertEqual(article.sheet_row_number, 2)
 
         mock_thread.assert_called_once()
         mock_thread.return_value.start.assert_called_once()
 
     def test_upload_google_sheet_rejects_invalid_sheet_reference(self):
-        url = reverse('upload_csv')
+        url = reverse('upload_spreadsheet')
         response = self.client.post(url, {'spreadsheet_url': 'not-a-sheet-link'})
 
         self.assertEqual(response.status_code, 200)
@@ -205,7 +189,7 @@ class UploadGoogleSheetTests(TestCase):
 
 class AnonymousAccessTests(TestCase):
     def test_upload_redirects_to_login(self):
-        response = self.client.get(reverse('upload_csv'))
+        response = self.client.get(reverse('upload_spreadsheet'))
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('login'), response.url)
 
@@ -224,7 +208,6 @@ class JobStatusPageTests(TestCase):
         )
         self.client.login(username='tester', password='testpass123')
         self.job = GenerationJob.objects.create(
-            uploaded_file=SimpleUploadedFile('test.csv', b'title,description\n'),
             total_rows=1,
             status=GenerationJob.Status.COMPLETED,
         )
@@ -238,13 +221,6 @@ class JobStatusPageTests(TestCase):
         self.assertContains(response, 'content')
         self.assertContains(response, 'status')
         self.assertContains(response, 'error')
-
-    def test_status_page_does_not_show_output_sheet_link(self):
-        url = reverse('job_status', kwargs={'job_id': self.job.pk})
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, 'Open output Google Sheet')
 
     def test_completed_job_with_spreadsheet_id_shows_open_sheet_link(self):
         self.job.status = GenerationJob.Status.COMPLETED

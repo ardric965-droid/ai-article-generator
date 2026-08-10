@@ -129,9 +129,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-# Uploaded files (e.g. CSV uploads)
-MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# Media settings are intentionally omitted — this project reads from and
+# writes results back to a Google Sheet via the Sheets API. No local file
+# uploads are handled.
 
 # Google Sheets Configuration
 GOOGLE_CREDENTIALS_FILE = os.environ.get(
@@ -148,7 +148,7 @@ PROMPTS_DIR = BASE_DIR / 'prompts'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'upload_csv'
+LOGIN_REDIRECT_URL = 'upload_spreadsheet'
 LOGOUT_REDIRECT_URL = 'login'
 
 

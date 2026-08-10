@@ -1,6 +1,5 @@
 from unittest.mock import patch
 
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from generator.models import ArticleResult, GenerationJob
@@ -11,10 +10,6 @@ from generator.services.processing_service import process_job
 class ProcessJobTests(TestCase):
     def setUp(self):
         self.job = GenerationJob.objects.create(
-            uploaded_file=SimpleUploadedFile(
-                'rows.csv',
-                b'title,description\n',
-            ),
             total_rows=2,
             status=GenerationJob.Status.PENDING,
             spreadsheet_id='sheet-id-123',
@@ -34,7 +29,7 @@ class ProcessJobTests(TestCase):
 
     @patch('generator.services.processing_service.generate_article')
     @patch('generator.services.processing_service.update_sheet_row')
-    @patch('generator.services.processing_service.ensure_output_columns')
+    @patch('generator.services.processing_service.ensure_result_columns')
     def test_process_job_saves_successful_articles_and_writes_back(
         self,
         mock_ensure_columns,
@@ -81,7 +76,7 @@ class ProcessJobTests(TestCase):
 
     @patch('generator.services.processing_service.generate_article')
     @patch('generator.services.processing_service.update_sheet_row')
-    @patch('generator.services.processing_service.ensure_output_columns')
+    @patch('generator.services.processing_service.ensure_result_columns')
     def test_process_job_continues_after_row_failure(
         self,
         mock_ensure_columns,
@@ -128,8 +123,8 @@ class ProcessJobTests(TestCase):
 
     @patch('generator.services.processing_service.generate_article')
     @patch('generator.services.processing_service.update_sheet_row')
-    @patch('generator.services.processing_service.ensure_output_columns')
-    def test_process_job_ensures_output_columns_and_updates_rows(
+    @patch('generator.services.processing_service.ensure_result_columns')
+    def test_process_job_ensures_result_columns_and_updates_rows(
         self,
         mock_ensure_columns,
         mock_update_row,
@@ -145,4 +140,3 @@ class ProcessJobTests(TestCase):
         mock_ensure_columns.assert_called_once()
         self.assertEqual(mock_ensure_columns.call_args[0][0], 'sheet-id-123')
         self.assertEqual(mock_update_row.call_count, 2)
-        self.assertIsNone(processed_job.output_sheet_url)

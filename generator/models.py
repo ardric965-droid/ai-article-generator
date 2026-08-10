@@ -11,19 +11,13 @@ class GenerationJob(models.Model):
         FAILED = 'failed', 'Failed'
         CANCELLED = 'cancelled', 'Cancelled'
 
-    uploaded_file = models.FileField(upload_to='uploads/')
-    output_sheet_url = models.URLField(
-        blank=True,
-        null=True,
-        help_text='URL of the new Google Sheet with the generated articles, shared with the user.',
-    )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='generation_jobs',
         null=True,
         blank=True,
-        help_text='The logged-in user who owns this job; used to share the output sheet.',
+        help_text='The logged-in user who started this job (optional, for auditing).',
     )
     status = models.CharField(
         max_length=20,
@@ -68,7 +62,6 @@ class ArticleResult(models.Model):
     )
     error_message = models.TextField(blank=True)
     attempts = models.PositiveSmallIntegerField(default=0)
-    sheet_row_number = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ['row_number']

@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from generator.models import ArticleResult, GenerationJob
 from generator.services.google_sheets_service import (
-    ensure_output_columns,
+    ensure_result_columns,
     get_google_sheets_service,
     update_sheet_row,
 )
@@ -61,9 +61,9 @@ def process_job(job_id: int) -> GenerationJob:
 
     service = get_google_sheets_service()
     try:
-        ensure_output_columns(job.spreadsheet_id, service)
+        ensure_result_columns(job.spreadsheet_id, service)
     except Exception as exc:
-        logger.warning('Could not ensure output columns for job %s: %s', job.pk, exc)
+        logger.warning('Could not ensure result columns for job %s: %s', job.pk, exc)
         job.status = GenerationJob.Status.FAILED
         job.completed_rows = 0
         job.failed_rows = 0

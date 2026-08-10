@@ -1,7 +1,6 @@
 import threading
 
 from django.contrib.auth.decorators import login_required
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import close_old_connections
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -33,7 +32,7 @@ def _run_async_job(job_id: int):
 
 
 @login_required
-def upload_csv(request):
+def upload_spreadsheet(request):
     if request.method == 'POST':
         form = SpreadsheetUploadForm(request.POST)
         if form.is_valid():
@@ -45,11 +44,6 @@ def upload_csv(request):
                 form.add_error('spreadsheet_url', str(exc))
             else:
                 job = GenerationJob.objects.create(
-                    uploaded_file=SimpleUploadedFile(
-                        f'{spreadsheet_id}.txt',
-                        b'',
-                        content_type='text/plain',
-                    ),
                     total_rows=len(rows),
                     status=GenerationJob.Status.PENDING,
                     spreadsheet_id=spreadsheet_id,
@@ -61,7 +55,6 @@ def upload_csv(request):
                         row_number=row['row_number'],
                         title=row['title'],
                         description=row['description'],
-                        sheet_row_number=row['row_number'],
                     )
                     for row in rows
                 ])
@@ -103,7 +96,6 @@ def job_status_api(request, job_id):
         'total_rows': job.total_rows,
         'progress': progress_value,
         'progress_text': f'{completed_rows + failed_rows}/{job.total_rows} rows processed',
-        'output_sheet_url': '',
         'spreadsheet_id': job.spreadsheet_id or '',
         'is_complete': job.status in {
             GenerationJob.Status.COMPLETED,

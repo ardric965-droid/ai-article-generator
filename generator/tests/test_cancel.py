@@ -1,7 +1,6 @@
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
@@ -20,7 +19,6 @@ class CancelJobViewTests(TestCase):
         )
         self.client.login(username='tester', password='testpass123')
         self.job = GenerationJob.objects.create(
-            uploaded_file=SimpleUploadedFile('test.csv', b'title,description\n'),
             total_rows=1,
             status=GenerationJob.Status.PROCESSING,
         )
@@ -63,7 +61,6 @@ class CancelJobViewTests(TestCase):
 class CancelJobProcessingTests(TestCase):
     def setUp(self):
         self.job = GenerationJob.objects.create(
-            uploaded_file=SimpleUploadedFile('test.csv', b'title,description\n'),
             total_rows=3,
             status=GenerationJob.Status.PENDING,
             spreadsheet_id='sheet-id-123',
@@ -79,7 +76,7 @@ class CancelJobProcessingTests(TestCase):
         )
 
     @patch('generator.services.processing_service.update_sheet_row')
-    @patch('generator.services.processing_service.ensure_output_columns')
+    @patch('generator.services.processing_service.ensure_result_columns')
     @patch('generator.services.processing_service.generate_article')
     def test_process_job_stops_when_cancelled_midway(
         self,
@@ -118,7 +115,7 @@ class CancelJobProcessingTests(TestCase):
         self.assertEqual(mock_update_row.call_count, 1)
 
     @patch('generator.services.processing_service.update_sheet_row')
-    @patch('generator.services.processing_service.ensure_output_columns')
+    @patch('generator.services.processing_service.ensure_result_columns')
     @patch('generator.services.processing_service.generate_article')
     def test_process_job_resumes_from_pending_rows_only(
         self,
@@ -164,7 +161,6 @@ class AnonymousCancelAccessTests(TestCase):
 
     def setUp(self):
         self.job = GenerationJob.objects.create(
-            uploaded_file=SimpleUploadedFile('test.csv', b'title,description\n'),
             total_rows=1,
             status=GenerationJob.Status.PROCESSING,
         )

@@ -212,8 +212,8 @@ def _column_letter(zero_based_index: int) -> str:
     return letters
 
 
-def ensure_output_columns(spreadsheet_id: str, service) -> None:
-    """Ensure the first row contains the required output headers.
+def ensure_result_columns(spreadsheet_id: str, service) -> None:
+    """Ensure the first row contains the required result headers.
 
     Required headers: title, description, content, status, error.
     Any missing headers are appended after the existing headers in the
@@ -330,8 +330,8 @@ def update_sheet_row(
     missing = [h for h in required if h not in header_indices]
     if missing:
         raise GoogleSheetsError(
-            f"The sheet is missing required output columns: {', '.join(missing)}. "
-            "Call ensure_output_columns first."
+            f"The sheet is missing required result columns: {', '.join(missing)}. "
+            "Call ensure_result_columns first."
         )
 
     update_values = []

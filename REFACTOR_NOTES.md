@@ -115,8 +115,7 @@ For single-row calls, the array will contain exactly one object. The app:
 
 - `GenerationJob`
   - Standard fields for job metadata (e.g., `status`, `total_rows`, `completed_rows`, `failed_rows`, `spreadsheet_id`, `created_at`, `completed_at`).
-  - `user` – optional FK to the Django user who started the job (for logging/auditing).
-  - `output_sheet_url` – present from a previous design iteration; **not used** in the current workflow.
+    - `user` – optional FK to the Django user who started the job (for logging/auditing).
 
 - `ArticleResult`
   - `job = models.ForeignKey(GenerationJob, on_delete=models.CASCADE)`
@@ -145,7 +144,23 @@ For single-row calls, the array will contain exactly one object. The app:
 - `static/`: CSS and JavaScript
 - `tests/`: automated tests
 
-Note: `google_sheets_output_service.py` (if present) is **deprecated** and no longer part of the core workflow.
+## Current workflow
+
+The app reads from a single Google Sheet (provided by the user and shared with
+the service account) and writes results back to that **same** sheet under the
+`content`, `status`, and `error` columns. There is no CSV upload, no local file
+upload, and no separate output sheet.
+
+Key service files:
+- `google_sheets_service.py` – reads rows from and writes results back to the
+  user's input Google Sheet.
+- `llm_service.py` – loads the prompt from `prompts/article_prompt.txt`, calls
+  the LLM, and validates the JSON response.
+- `processing_service.py` – background processing (one thread per job) with
+  cancellation and resume support.
+
+Note: `google_sheets_output_service.py` was deprecated and has been **removed**.
+Results are written back to the user's original sheet, not a new one.
 
 ## Implementation phases (current)
 
@@ -158,7 +173,7 @@ Note: `google_sheets_output_service.py` (if present) is **deprecated** and no lo
 7. Cancellation and resume ✅
 8. Progress polling ✅
 9. Tests and documentation ✅
-10. Cleanup: remove deprecated output-sheet code (optional)
+10. Cleanup: remove deprecated output-sheet code ✅
 
 ## Implementation approach
 

@@ -3,7 +3,7 @@ from django.urls import path
 from generator import views
 
 urlpatterns = [
-    path('', views.upload_csv, name='upload_csv'),
+    path('', views.upload_spreadsheet, name='upload_spreadsheet'),
     path('jobs/<int:job_id>/status/', views.job_status, name='job_status'),
     path('jobs/<int:job_id>/status/api/', views.job_status_api, name='job_status_api'),
     path('jobs/<int:job_id>/stop/', views.stop_job, name='stop_job'),
