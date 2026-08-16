@@ -1,6 +1,8 @@
 import re
 
 from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
 
 
 class SpreadsheetUploadForm(forms.Form):
@@ -21,3 +23,16 @@ class SpreadsheetUploadForm(forms.Form):
                 and not re.match(r'^[a-zA-Z0-9-_]{25,}$', spreadsheet_url):
             raise forms.ValidationError('Enter a valid Google Sheets URL or spreadsheet ID.')
         return spreadsheet_url
+
+
+class SignUpForm(UserCreationForm):
+    email = forms.EmailField(required=True)
+
+    class Meta:
+        model = User
+        fields = ("username", "email", "password1", "password2")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in self.fields:
+            self.fields[field_name].widget.attrs.update({'class': 'form-control'})

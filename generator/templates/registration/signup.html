@@ -1,0 +1,49 @@
+{% extends "generator/base.html" %}
+
+{% block title %}Sign Up | AI Article Generator{% endblock %}
+
+{% block content %}
+<h1>Sign Up</h1>
+<p class="muted">Create an account to start generating articles.</p>
+
+<div class="card">
+    {% if form.errors %}
+        <div class="errors">
+            <ul>
+            {% for field in form %}
+                {% for error in field.errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        <p>
+            <label for="id_username">Username</label>
+            {{ form.username }}
+        </p>
+
+        <p>
+            <label for="id_email">Email</label>
+            {{ form.email }}
+        </p>
+
+        <p>
+            <label for="id_password1">Password</label>
+            {{ form.password1 }}
+        </p>
+
+        <p>
+            <label for="id_password2">Confirm password</label>
+            {{ form.password2 }}
+        </p>
+
+        <button type="submit">Sign up</button>
+    </form>
+    <p class="muted">Already have an account? <a href="{% url 'login' %}" style="color: #4f46e5;">Log in</a></p>
+</div>
+{% endblock %}

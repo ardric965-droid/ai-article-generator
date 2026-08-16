@@ -284,9 +284,13 @@
             <div style="font-size: 0.95rem; color: #475569;">
                 {% if user.is_authenticated %}
                     <span>Signed in as {{ user.email|default:user.username }}</span>
-                    <a href="{% url 'logout' %}" style="margin-left: 0.75rem; color: #4f46e5; text-decoration: none; font-weight: 600;">Logout</a>
+                    <form method="post" action="{% url 'logout' %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" style="margin-left: 0.75rem; color: #4f46e5; text-decoration: none; font-weight: 600; background:none; border:none; cursor:pointer; padding:0; font:inherit;">Logout</button>
+                    </form>
                 {% else %}
                     <a href="{% url 'login' %}" style="color: #4f46e5; text-decoration: none; font-weight: 600;">Login</a>
+                    <a href="{% url 'signup' %}" style="margin-left: 0.75rem; color: #4f46e5; text-decoration: none; font-weight: 600;">Sign up</a>
                 {% endif %}
             </div>
         </div>

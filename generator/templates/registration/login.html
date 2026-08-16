@@ -9,7 +9,7 @@
 <div class="card">
     {% if form.errors %}
         <div class="errors">
-            <strong>Your username and password didn’t match.</strong>
+            <strong>Your username and password didn't match.</strong>
         </div>
     {% endif %}
 
@@ -37,5 +37,6 @@
 
         <button type="submit">Sign in</button>
     </form>
+    <p class="muted">Don't have an account? <a href="{% url 'signup' %}" style="color: #4f46e5;">Sign up</a></p>
 </div>
 {% endblock %}
