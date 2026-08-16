@@ -107,11 +107,24 @@ def validate_sheet_connection(url_or_id: str) -> str:
         raise GoogleAPIError(f"An unexpected error occurred while connecting to Google Sheets: {exc}") from exc
 
 
+def _read_cell(row_values, header_indices, col_name):
+    """Read and strip a single cell value from a row by column header name.
+
+    Returns an empty string when the column is absent or the row is too short
+    to contain the requested column.
+    """
+    col_idx = header_indices.get(col_name)
+    if col_idx is None or col_idx >= len(row_values):
+        return ''
+    return str(row_values[col_idx]).strip()
+
+
 def read_sheet_rows(spreadsheet_id: str) -> list[dict]:
     """Read data rows (titles and descriptions) from the first sheet.
-    
-    Validates headers and row values. Dynamically appends output headers if missing.
-    Returns a list of dicts: [{'row_number': int, 'title': str, 'description': str}]
+
+    Validates headers and row values.
+    Returns a list of dicts: [{'row_number': int, 'title': str, 'description': str,
+    'status': str, 'content': str, 'error': str}]
     """
     service = get_google_sheets_service()
     
@@ -176,24 +189,22 @@ def read_sheet_rows(spreadsheet_id: str) -> list[dict]:
         # Skip completely empty rows
         if not any(str(cell).strip() for cell in row):
             continue
-            
-        title = ""
-        if title_idx < len(row):
-            title = str(row[title_idx]).strip()
-            
-        desc = ""
-        if desc_idx < len(row):
-            desc = str(row[desc_idx]).strip()
-            
+
+        title = _read_cell(row, header_indices, 'title')
+        desc = _read_cell(row, header_indices, 'description')
+
         if not title:
             raise GoogleSheetsError(f"Row {idx}: title must not be empty.")
         if not desc:
             raise GoogleSheetsError(f"Row {idx}: description must not be empty.")
-            
+
         rows.append({
             'row_number': idx,
             'title': title,
-            'description': desc
+            'description': desc,
+            'status': _read_cell(row, header_indices, 'status'),
+            'content': _read_cell(row, header_indices, 'content'),
+            'error': _read_cell(row, header_indices, 'error'),
         })
         
     if not rows:
@@ -361,3 +372,41 @@ def update_sheet_row(
         ) from exc
     except Exception as exc:
         raise GoogleAPIError(f"Failed to update row {row_number}: {exc}") from exc
+
+
+def classify_rows_for_job(rows: list[dict]) -> dict:
+    """Classify sheet rows into completed vs. pending for a generation job.
+
+    A row is considered "completed" only when its ``status`` column (matched
+    case-insensitively against 'completed', whitespace-trimmed) equals
+    'completed' AND its ``content`` column is non-empty. Every other row --
+    including rows marked 'completed' with empty content (which indicate a
+    previous failed or incomplete write-back) -- is treated as pending and
+    eligible for processing.
+
+    Returns a dict with:
+        - 'all_completed': bool -- True when there are no pending rows and at
+          least one completed row.
+        - 'completed_count': int
+        - 'pending_count': int
+        - 'pending_rows': list -- rows that need to be processed.
+        - 'completed_rows': list -- rows already completed.
+    """
+    completed_rows = []
+    pending_rows = []
+    for row in rows:
+        status = (row.get('status') or '').strip().lower()
+        content = (row.get('content') or '').strip()
+        if status == 'completed' and content:
+            completed_rows.append(row)
+        else:
+            pending_rows.append(row)
+    completed_count = len(completed_rows)
+    pending_count = len(pending_rows)
+    return {
+        'all_completed': pending_count == 0 and completed_count > 0,
+        'completed_count': completed_count,
+        'pending_count': pending_count,
+        'pending_rows': pending_rows,
+        'completed_rows': completed_rows,
+    }

@@ -71,6 +71,9 @@ class ArticleResult(models.Model):
                 name='unique_article_row_per_job',
             ),
         ]
+        indexes = [
+            models.Index(fields=['job', 'status'], name='article_job_status_idx'),
+        ]
 
     def __str__(self):
         title_preview = self.title[:50] + '…' if len(self.title) > 50 else self.title

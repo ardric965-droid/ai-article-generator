@@ -9,6 +9,7 @@ from generator.services.google_sheets_service import (
     get_google_sheets_service,
     validate_sheet_connection,
     read_sheet_rows,
+    classify_rows_for_job,
     InvalidSpreadsheetURLError,
     SpreadsheetNotFoundError,
     SpreadsheetPermissionError,
@@ -172,12 +173,18 @@ class GoogleSheetsServiceTests(TestCase):
         self.assertEqual(result[0], {
             'row_number': 2,
             'title': 'Exercising',
-            'description': 'Improve health.'
+            'description': 'Improve health.',
+            'status': '',
+            'content': '',
+            'error': '',
         })
         self.assertEqual(result[1], {
             'row_number': 3,
             'title': 'Saving',
-            'description': 'Personal finance.'
+            'description': 'Personal finance.',
+            'status': '',
+            'content': '',
+            'error': '',
         })
         
         mock_service.spreadsheets.return_value.get.assert_called_once_with(
@@ -289,3 +296,59 @@ class GoogleSheetsServiceTests(TestCase):
         with self.assertRaises(GoogleSheetsError) as ctx:
             read_sheet_rows('dummy-id')
         self.assertIn("Row 2: description must not be empty", str(ctx.exception))
+
+
+class ClassifyRowsForJobTests(TestCase):
+    def test_all_pending_rows(self):
+        rows = [
+            {'row_number': 2, 'title': 'T1', 'description': 'D1', 'status': '', 'content': '', 'error': ''},
+            {'row_number': 3, 'title': 'T2', 'description': 'D2', 'status': 'pending', 'content': '', 'error': ''},
+        ]
+        result = classify_rows_for_job(rows)
+        self.assertFalse(result['all_completed'])
+        self.assertEqual(result['completed_count'], 0)
+        self.assertEqual(result['pending_count'], 2)
+        self.assertEqual(len(result['pending_rows']), 2)
+        self.assertEqual(len(result['completed_rows']), 0)
+
+    def test_completed_without_content_treated_as_pending(self):
+        # A 'completed' status with empty content is treated as pending
+        # because it indicates a previous incomplete write-back.
+        row = {'row_number': 2, 'title': 'T1', 'description': 'D1', 'status': 'completed', 'content': '', 'error': ''}
+        result = classify_rows_for_job([row])
+        self.assertFalse(result['all_completed'])
+        self.assertEqual(result['completed_count'], 0)
+        self.assertEqual(result['pending_count'], 1)
+        self.assertIn(row, result['pending_rows'])
+
+    def test_mixed_rows_case_and_space_insensitive(self):
+        rows = [
+            {'row_number': 2, 'title': 'T1', 'description': 'D1', 'status': '  Completed  ', 'content': 'Body one', 'error': ''},
+            {'row_number': 3, 'title': 'T2', 'description': 'D2', 'status': 'COMPLETED', 'content': 'Body two', 'error': ''},
+            {'row_number': 4, 'title': 'T3', 'description': 'D3', 'status': 'failed', 'content': '', 'error': 'boom'},
+            {'row_number': 5, 'title': 'T4', 'description': 'D4', 'status': '', 'content': '', 'error': ''},
+        ]
+        result = classify_rows_for_job(rows)
+        self.assertFalse(result['all_completed'])
+        self.assertEqual(result['completed_count'], 2)
+        self.assertEqual(result['pending_count'], 2)
+        self.assertEqual([r['row_number'] for r in result['completed_rows']], [2, 3])
+        self.assertEqual([r['row_number'] for r in result['pending_rows']], [4, 5])
+
+    def test_all_completed(self):
+        rows = [
+            {'row_number': 2, 'title': 'T1', 'description': 'D1', 'status': 'completed', 'content': 'Body', 'error': ''},
+            {'row_number': 3, 'title': 'T2', 'description': 'D2', 'status': 'completed', 'content': 'Body', 'error': ''},
+        ]
+        result = classify_rows_for_job(rows)
+        self.assertTrue(result['all_completed'])
+        self.assertEqual(result['completed_count'], 2)
+        self.assertEqual(result['pending_count'], 0)
+        self.assertEqual(len(result['completed_rows']), 2)
+        self.assertEqual(len(result['pending_rows']), 0)
+
+    def test_no_rows(self):
+        result = classify_rows_for_job([])
+        self.assertFalse(result['all_completed'])
+        self.assertEqual(result['completed_count'], 0)
+        self.assertEqual(result['pending_count'], 0)

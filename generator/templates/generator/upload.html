@@ -21,7 +21,10 @@
 </div>
 
 <div class="card">
-    <form method="post">
+    <!-- The plain form POSTs to upload_spreadsheet as a non-JS fallback.
+         When JS is available the submit is intercepted to run the two-step
+         preview -> confirm flow below. -->
+    <form method="post" id="upload-form">
         {% csrf_token %}
 
         {% if form.non_field_errors %}
@@ -51,7 +54,160 @@
             {% endif %}
         </p>
 
-        <button type="submit">Create job from sheet</button>
+        <button type="submit" id="submit-btn">Create job from sheet</button>
     </form>
 </div>
+
+<!-- Populated by the preview flow. Hidden until the user submits the sheet URL. -->
+<div id="preview-result" class="card" style="display:none;">
+    <h2>Sheet preview</h2>
+    <div id="preview-content"></div>
+</div>
+
+<script>
+    (function () {
+        var form = document.getElementById('upload-form');
+        var previewCard = document.getElementById('preview-result');
+        var previewContent = document.getElementById('preview-content');
+        var submitBtn = document.getElementById('submit-btn');
+
+        // Build the job-status URL by substituting the placeholder "0" with the
+        // real job id (e.g. "/jobs/0/status/" -> "/jobs/123/status/").
+        var JOB_STATUS_BASE = "{% url 'job_status' job_id=0 %}";
+
+        function getCsrfToken() {
+            var tokenInput = document.querySelector('input[name=csrfmiddlewaretoken]');
+            return tokenInput ? tokenInput.value : '';
+        }
+
+        function getSpreadsheetUrl() {
+            var input = document.querySelector('input[name="spreadsheet_url"]');
+            return input ? input.value.trim() : '';
+        }
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+
+        function jobStatusUrl(jobId) {
+            return JOB_STATUS_BASE.replace('0', String(jobId));
+        }
+
+        function showError(message) {
+            previewContent.innerHTML =
+                '<p class="errors"><strong>' + escapeHtml(message) + '</strong></p>';
+            previewCard.style.display = 'block';
+        }
+
+        function handlePreview(data) {
+            var html = '<p>' + escapeHtml(data.message) + '</p>';
+
+            if (data.all_completed) {
+                // Resume existing completed job: the sheet is fully done. If a
+                // previous job exists, link to it so the user can review; the
+                // submit button is hidden because there is nothing to generate.
+                if (data.existing_job_id) {
+                    html += '<p><a href="' + jobStatusUrl(data.existing_job_id) +
+                        '" class="button">View existing job</a></p>';
+                }
+                submitBtn.style.display = 'none';
+            } else {
+                // Partial completion: only incomplete rows will be processed.
+                // A dedicated confirm button replaces the plain submit so the
+                // user explicitly opts in before the background job starts.
+                var buttonLabel = data.completed_count > 0
+                    ? 'Confirm and start generation'
+                    : 'Start generation';
+                html += '<button type="button" id="confirm-generate-btn" class="button button-success">' +
+                    escapeHtml(buttonLabel) + '</button>';
+                submitBtn.style.display = 'none';
+            }
+
+            previewContent.innerHTML = html;
+            previewCard.style.display = 'block';
+
+            var confirmBtn = document.getElementById('confirm-generate-btn');
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', startGeneration);
+            }
+        }
+
+        function startGeneration() {
+            var csrfToken = getCsrfToken();
+            var spreadsheetUrl = getSpreadsheetUrl();
+
+            previewContent.innerHTML = '<p>Creating generation job...</p>';
+
+            var confirmBtn = document.getElementById('confirm-generate-btn');
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+            }
+
+            fetch("{% url 'create_generation_job' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({ 'spreadsheet_url': spreadsheetUrl }),
+            })
+                .then(async function (response) {
+                    var data = await response.json();
+                    if (!response.ok) {
+                        showError(data.error || 'Failed to create generation job.');
+                        return null;
+                    }
+                    return data;
+                })
+                .then(function (data) {
+                    if (data) {
+                        window.location = jobStatusUrl(data.job_id);
+                    }
+                })
+                .catch(function () {
+                    showError('An unexpected error occurred. Please try again.');
+                });
+        }
+
+        function runPreview() {
+            var csrfToken = getCsrfToken();
+            var spreadsheetUrl = getSpreadsheetUrl();
+
+            fetch("{% url 'preview_generation' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({ 'spreadsheet_url': spreadsheetUrl }),
+            })
+                .then(async function (response) {
+                    var data = await response.json();
+                    if (!response.ok) {
+                        showError(data.error || 'An error occurred while previewing the sheet.');
+                        return null;
+                    }
+                    return data;
+                })
+                .then(function (data) {
+                    if (data) {
+                        handlePreview(data);
+                    }
+                })
+                .catch(function () {
+                    showError('An unexpected error occurred. Please try again.');
+                });
+        }
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            // Restore the submit button in case a prior preview ran, then re-run
+            // the preview against the (possibly edited) sheet URL.
+            submitBtn.style.display = '';
+            runPreview();
+        });
+    })();
+</script>
 {% endblock %}
